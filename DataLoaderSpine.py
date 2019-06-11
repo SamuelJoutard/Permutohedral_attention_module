@@ -13,7 +13,7 @@ def load(list_dir):
         for fold_ in tqdm(os.listdir(fold)):
             if "sub" in fold_:
                 im_file = os.path.join(fold, fold_) + "/" + fold_ + "_CT.nii.gz"
-                label_file = os.path.join(fold, fold_) + "/" + fold_ + "_segmentation_relab_bis.nii.gz"
+                label_file = os.path.join(fold, fold_) + "/" + fold_ + "_segmentation.nii.gz"
                 im = nib.load(im_file,)
                 lab = nib.load(label_file, )
                 affine_im = im.affine
