@@ -45,7 +45,6 @@ class PermutohedralLattice(torch.autograd.Function):
     
     def prepare(feat):
         B, n_ch, n_voxels = feat.size()
-        ### embed features into higher dimension space ###
         n_ch_1 = n_ch + 1
         conv_tensor = np.tril(np.ones((n_ch+1, n_ch+1)), -1).T
         conv_tensor += np.diag([-i for i in range(n_ch+1)])
@@ -103,13 +102,7 @@ class PermutohedralLattice(torch.autograd.Function):
             dic_hash_lattice.add_values(loc_hash[scit].view(-1), loc[scit])
         
         dic_hash_lattice.filter_values()
-        # The additional index hash table is used to
-        # linearise the hash table so that we can `tf.scatter` and `tf.gather`
-        # (range_id 0 reserved for the indextable's default value)
         fused_loc = dic_hash_lattice.export_values()
-#         fused_loc = torch.stack(list(dic_hash_lattice.values()),0)
-#         range_id = torch.arange(1, K.size(0)+1).cuda()
-#         dic_hash_index.add_values(K, range_id)
         dic_hash_lattice.update_rank()
 
         indices = [None] * n_ch_1
@@ -117,17 +110,11 @@ class PermutohedralLattice(torch.autograd.Function):
         blur_neighbours2 = [None] * n_ch_1
         default = torch.tensor(0).type(torch.LongTensor).cuda()
         for dit in range(n_ch_1):
-            # the neighbors along each axis.
             offset = [n_ch if i == dit else -1 for i in range(n_ch)]
             offset = torch.cuda.FloatTensor(offset) 
-#             offset = torch.cuda.DoubleTensor(offset) 
-#             blur_neighbours1[dit] = dic_hash_index.get_values(_simple_hash(fused_loc + offset).view(-1))[:, 0]
-#             blur_neighbours2[dit] = dic_hash_index.get_values(_simple_hash(fused_loc - offset).view(-1))[:, 0]
-#             indices[dit] = dic_hash_index.get_values(loc_hash[dit].view(-1))[:, 0].view(B, n_voxels)
             blur_neighbours1[dit] = dic_hash_lattice.get_rank(_simple_hash(fused_loc + offset).view(-1))[:, 0]
             blur_neighbours2[dit] = dic_hash_lattice.get_rank(_simple_hash(fused_loc - offset).view(-1))[:, 0]
             indices[dit] = dic_hash_lattice.get_rank(loc_hash[dit].view(-1)).view(B, n_voxels)
-#         dic_hash_lattice.clear_table()
         return rank, barycentric, blur_neighbours1, blur_neighbours2, indices
     
     def permutohedral_compute(data_vector,
@@ -168,7 +155,6 @@ class PermutohedralLattice(torch.autograd.Function):
                 splat[:, :, :1], splat[:, :, 1:] + 0.5 * (b1 + b3)], 2)
         # Slice
         sliced = 0.0
-        # Alpha is a magic scaling constant from CRFAsRNN code
         alpha = 1. / (1. + np.power(2., -n_ch))
         for scit in range(0, n_ch_1):
             sliced += (torch.gather(splat, 
@@ -190,27 +176,13 @@ class PermutohedralLattice(torch.autograd.Function):
                           blur_neighbours2,
                           indices,
                           low_precision=False):
-        """
-        Splat, Gaussian blur, and slice
-
-        :param data_vector: value map to be filtered
-        :param barycentric: embedding coordinates
-        :param blur_neighbours1: first neighbours' coordinates relative to indices
-        :param blur_neighbours2: second neighbours' coordinates relative to indices
-        :param indices: corresponding locations of data_vector
-        :param reverse: transpose the Gaussian kernel if True
-        :return: filtered data_vector (sliced to the original space)
-        """
         n_ch_1 = barycentric.size(1)
         n_ch = n_ch_1 - 1
         n_ch_1 = n_ch + 1
         
-#         B, n_voxels, n_ch_data = data_vector.size()
         B, n_ch_data, n_voxels = data_vector.size()
 
         # Splatting
-#         splat = torch.zeros((B, blur_neighbours1[0].size(0)+1, n_ch_data))
-#         splat = torch.zeros((B, n_ch_data, blur_neighbours1[0].size(0)+1))
         splat = torch.zeros((B, n_ch_data, blur_neighbours1[0].size(0)+1)).cuda()
         for scit in range(n_ch_1):
             data = (data_vector * 
@@ -228,7 +200,6 @@ class PermutohedralLattice(torch.autograd.Function):
             
         # Slice
         sliced_feat = [None] * n_ch_1
-        # Alpha is a magic scaling constant from CRFAsRNN code
         alpha = 1. / (1. + np.power(2., -n_ch))
         for scit in range(0, n_ch_1):
             grads = torch.gather(splat, 
@@ -282,7 +253,6 @@ class PermutohedralLattice(torch.autograd.Function):
         sliced_feat = F.conv1d(sliced_feat, conv_filter)
 
         sliced_desc = 0.0
-        # Alpha is a magic scaling constant from CRFAsRNN code
         alpha = 1. / (1. + np.power(2., -n_ch))
         for scit in range(0, n_ch_1):
             sliced_desc = sliced_desc + (torch.gather(splat, 
@@ -295,56 +265,6 @@ class PermutohedralLattice(torch.autograd.Function):
                             alpha)
         
         return sliced_feat, sliced_desc  
-        
-        
-        
-if __name__=="__main__":
-    # np.random.seed(0)
-    # feat = np.random.rand(2, 5, 1, 3)
-    # desc = np.random.rand(2, 5, 1, 5)
-    # feat = feat[:, :, 0]
-    # desc = desc[:, :, 0]
-    # feat = np.transpose(feat, (0, 2, 1))
-    # desc = np.transpose(desc, (0, 2, 1))
-    # pl = PermutohedralLattice.apply
-    # feat = torch.cuda.FloatTensor(feat)
-    # desc = torch.cuda.FloatTensor(desc)
-    # feat.requires_grad = True
-    # desc.requires_grad = True
-    # out = pl(feat, desc)
-    # loss = out.sum()
-    # loss.backward()
-    # print(out.permute(1,0,2))
-    # print(feat.grad)
-    # print(desc.grad)
-
-    def brute_force(feat, desc):
-        res = np.zeros(desc.shape)
-        for b in range(feat.shape[0]):
-            for i in range(feat.shape[-1]):
-                for j in range(feat.shape[-1]):
-                    res[b, :, i] += np.exp(-((feat[b, :, i] - feat[b, :, j])**2).sum()) * desc[b, :, j]
-        return res
-
-    np.random.seed(0)
-    feat = 10*np.random.rand(2, 5, 1000)
-    desc = np.random.rand(2, 12, 1000)
-
-    res = brute_force(feat, desc)
-
-    pl = PermutohedralLattice.apply
-    feat = torch.cuda.FloatTensor(feat)
-    desc = torch.cuda.FloatTensor(desc)
-    out = pl(feat, desc)
-    out = out.cpu().numpy()
-
-    relat_error = np.abs(out-res)/(np.abs(res)+0.00001)
-    print(relat_error.max())
-    print(relat_error.mean())
-              
-        
-        
-        
         
         
         

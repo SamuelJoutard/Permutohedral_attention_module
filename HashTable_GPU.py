@@ -3,7 +3,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-
 class HashTable(object):
     def __init__(self, n_ch, dtype, table_size):
         self.n_ch = n_ch
@@ -14,13 +13,11 @@ class HashTable(object):
         self.unikeys = None
         self.table_size = table_size
         
-        
     def add_values(self, keys, values):
         if len(values.size())==1:
             values = values.unsqueeze(1)
         keys = keys%self.table_size
         keys = keys.type(torch.cuda.LongTensor)
-#         keys_ = torch.cat([values.type(torch.cuda.DoubleTensor), keys.unsqueeze(1)], 1)
         keys_ = torch.cat([values.type(torch.cuda.LongTensor), keys.unsqueeze(1)], 1)
         unikeys = torch.unique(keys_, dim=0)
         self.indices = torch.cat([self.indices, unikeys[:, -1]])
@@ -28,7 +25,6 @@ class HashTable(object):
         if self.indices[0]==(-12):
             self.indices = self.indices[1:]
             self.values = self.values[1:]
-    
     
     def filter_values(self):
         order = torch.argsort(self.indices)
@@ -61,19 +57,8 @@ class HashTable(object):
             self.values = self.values[index]
             self.indices = self.indices[index]
             
-#             self.values = torch.cat([self.values[self.indices==k][0:1] for k in unikeys], 0)
-#             self.indices = torch.cat([self.indices[self.indices==k][0:1] for k in unikeys], 0)
-#         keys_ = torch.cat([self.values.type(torch.cuda.LongTensor), self.indices.unsqueeze(1)], 1)
-#         unikeys = torch.unique(keys_, dim=0)
-#         self.indices = unikeys[:, -1]
-#         self.values = unikeys[:, :-1].type(torch.cuda.FloatTensor)
-        
-    
     def update_rank(self):
-#         order = torch.argsort(self.indices)
         self.rank = torch.arange(1, self.indices.size(0) + 1).cuda()
-#         self.unikeys = torch.unique(self.indices)
-                
     
     def get_values(self, keys):
         keys = keys%self.table_size
@@ -95,22 +80,17 @@ class HashTable(object):
         prod = torch.sparse.mm(indices_sp_m, rank_sp_m)
         return prod.type(torch.cuda.LongTensor)
     
-    
     def export(self):
         return self.indices, self.values
-    
     
     def export_values(self):
         return self.values
     
-    
     def export_indices(self):
         return self.indices
-    
     
     def clear_table(self):
         del(self.indices)
         del(self.values)
         del(self.rank)
-#         torch.cuda.empty_cache()
         
