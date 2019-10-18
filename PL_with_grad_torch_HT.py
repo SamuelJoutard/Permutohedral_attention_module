@@ -75,8 +75,6 @@ class PermutohedralLattice(torch.autograd.Function):
         [[i] * ((n_ch + 1) - i) + [i - (n_ch + 1)] * i for i in range(n_ch + 1)])
         
         def _simple_hash(key):
-            # WARNING: This hash function does not guarantee
-            # uniqueness of different position_vectors
             key = key.type(torch.cuda.DoubleTensor)
             hash_vector = np.floor(np.power(np.iinfo(np.int64).max, 1. / (n_ch + 2)))
             hash_vector = torch.pow(hash_vector, torch.arange(1, n_ch + 1))
@@ -122,18 +120,6 @@ class PermutohedralLattice(torch.autograd.Function):
                           blur_neighbours1,
                           blur_neighbours2,
                           indices):
-        """
-        Splat, Gaussian blur, and slice
-
-        :param data_vector: value map to be filtered
-        :param barycentric: embedding coordinates
-        :param blur_neighbours1: first neighbours' coordinates relative to indices
-        :param blur_neighbours2: second neighbours' coordinates relative to indices
-        :param indices: corresponding locations of data_vector
-        :param name: layer name
-        :param reverse: transpose the Gaussian kernel if True
-        :return: filtered data_vector (sliced to the original space)
-        """
         n_ch_1 = barycentric.size(1)
         n_ch = n_ch_1 - 1
         B, n_ch_data, n_voxels = data_vector.size()
