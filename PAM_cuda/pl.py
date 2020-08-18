@@ -49,6 +49,13 @@ class PermutohedralLattice(torch.autograd.Function):
                                                                   bl_ne1,
                                                                   bl_ne2,
                                                                   indices)
+        del(ctx.bl_ne1)
+        del(ctx.bl_ne2)
+        del(ctx.indices)
+        del(ctx.barycentric)
+        del(ctx.rank)
+        del(ctx.splat)
+        del(ctx.desc)
         return out
     
     @staticmethod
