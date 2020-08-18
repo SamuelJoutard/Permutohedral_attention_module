@@ -97,7 +97,7 @@ class PermutohedralLattice(torch.autograd.Function):
         rank = rank.contiguous()
 
         table_size = 20000003
-        hash_vector = np.floor(np.power(table_size, 1. / (n_ch)))
+        hash_vector = int(np.floor(np.power(table_size, 1. / (n_ch))))
         hash_vector = torch.pow(hash_vector, torch.arange(0, n_ch))
         hash_vector = hash_vector.type(torch.IntTensor)
         hash_vector = hash_vector.cuda()
