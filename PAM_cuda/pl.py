@@ -102,7 +102,9 @@ class PermutohedralLattice(torch.autograd.Function):
         hash_vector = hash_vector.type(torch.IntTensor)
         hash_vector = hash_vector.cuda()
 
-        table = torch.zeros((table_size, n_ch_1)).type(torch.IntTensor).cuda() - 2
+        device = hash_vector.device
+        table = torch.zeros((table_size, n_ch_1), device=device, dtype=torch.int32) - 2  # fast: 2ms.
+        ## table = torch.zeros((table_size, n_ch_1)).type(torch.IntTensor).cuda() - 2  # slow: 320ms.
         n_entries = torch.zeros((1,)).type(torch.IntTensor).cuda() + 1
 
         loc = [None] * (n_ch + 1)
